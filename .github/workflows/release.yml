@@ -48,7 +48,12 @@ jobs:
           generate_release_notes: true
 
       - name: Publish to Visual Studio Marketplace
-        if: ${{ secrets.VSCE_PAT != '' }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx --yes @vscode/vsce publish --packagePath artifacts/*.vsix -p "$VSCE_PAT"
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "VSCE_PAT not configured; skipping Marketplace publish."
+            exit 0
+          fi
+          VSIX_PATH="$(ls artifacts/*.vsix | head -n 1)"
+          npx --yes @vscode/vsce publish --packagePath "$VSIX_PATH" -p "$VSCE_PAT"

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.2
+
+### Fixes
+
+- Release workflow no longer depends on GitHub Actions expression parsing for `VSCE_PAT`
+- Marketplace publish step now degrades cleanly when the publisher token is not configured
+
 ## v1.1.1
 
 ### Fixes
