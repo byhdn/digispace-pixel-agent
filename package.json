@@ -2,17 +2,35 @@
   "name": "digispace-pixel-agent",
   "displayName": "DigiSpace",
   "description": "Pixel office dashboard for Codex, Claude, Gemini, and Vibe-driven AI delivery lanes",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "publisher": "byhdn",
   "repository": {
     "type": "git",
     "url": "https://github.com/byhdn/digispace-pixel-agent"
+  },
+  "homepage": "https://github.com/byhdn/digispace-pixel-agent",
+  "bugs": {
+    "url": "https://github.com/byhdn/digispace-pixel-agent/issues"
   },
   "icon": "icon.png",
   "license": "MIT",
   "engines": {
     "vscode": "^1.107.0"
   },
+  "galleryBanner": {
+    "color": "#111827",
+    "theme": "dark"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "codex",
+    "claude",
+    "gemini",
+    "kanban",
+    "pixel-art",
+    "automation"
+  ],
   "categories": [
     "Other"
   ],

@@ -1,18 +1,16 @@
 # DigiSpace
 
-A VS Code extension that turns your AI coding agents into animated pixel art characters in a virtual office.
+DigiSpace is a VS Code extension that turns your AI delivery lanes into animated pixel art characters in a virtual office.
 
-Each Claude Code terminal you open spawns a character that walks around, sits at desks, and visually reflects what the agent is doing — typing when writing code, reading when searching files, waiting when it needs your attention.
+It keeps the original terminal-driven Pixel Agents experience for Claude Code, and adds an external bridge model for Codex, Gemini, and Vibe-based orchestration.
 
-This repository contains the DigiSpace fork of Pixel Agents for VS Code, adapted to visualize Codex, Claude, Gemini, and Vibe-driven delivery lanes.
-
-
-![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
+![DigiSpace screenshot](webview-ui/public/Screenshot.jpg)
 
 ## Features
 
-- **One agent, one character** — every Claude Code terminal gets its own animated character
+- **One agent, one character** — every tracked lane gets its own animated character
 - **Live activity tracking** — characters animate based on what the agent is actually doing (writing, reading, running commands)
+- **External bridge support** — visualize Codex, Gemini, Claude arbitration lanes, and Vibe workspaces from `.digispace/external-agents.json`
 - **Office layout editor** — design your office with floors, walls, and furniture using a built-in editor
 - **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
 - **Sound notifications** — optional chime when an agent finishes its turn
@@ -21,23 +19,24 @@ This repository contains the DigiSpace fork of Pixel Agents for VS Code, adapted
 - **Diverse characters** — 6 diverse characters. These are based on the amazing work of [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack).
 
 <p align="center">
-  <img src="webview-ui/public/characters.png" alt="Pixel Agents characters" width="320" height="72" style="image-rendering: pixelated;">
+  <img src="webview-ui/public/characters.png" alt="DigiSpace characters" width="320" height="72" style="image-rendering: pixelated;">
 </p>
 
 ## Requirements
 
-- VS Code 1.109.0 or later
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured
+- VS Code 1.107.0 or later
+- Optional: Claude Code CLI for terminal-native agents
+- Optional: an external bridge that writes `.digispace/external-agents.json`
 
 ## Getting Started
 
-If you just want to use Pixel Agents, the easiest way is to download the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents). If you want to play with the code, develop, or contribute, then:
+If you just want to use DigiSpace, install the VSIX or the Marketplace build once it is published. If you want to develop or contribute, use the fork directly:
 
 ### Install from source
 
 ```bash
-git clone https://github.com/pablodelucca/pixel-agents.git
-cd pixel-agents
+git clone https://github.com/byhdn/digispace-pixel-agent.git
+cd digispace-pixel-agent
 npm install
 cd webview-ui && npm install && cd ..
 npm run build
@@ -47,9 +46,9 @@ Then press **F5** in VS Code to launch the Extension Development Host.
 
 ### Usage
 
-1. Open the **Pixel Agents** panel (it appears in the bottom panel area alongside your terminal)
+1. Open the **DigiSpace** panel
 2. Click **+ Agent** to spawn a new Claude Code terminal and its character
-3. Start coding with Claude — watch the character react in real time
+3. Or feed DigiSpace through `.digispace/external-agents.json` for external agents
 4. Click a character to select it, then click a seat to reassign it
 5. Click **Layout** to open the office editor and customize your space
 
@@ -69,7 +68,7 @@ The grid is expandable up to 64×64 tiles. Click the ghost border outside the cu
 
 The office tileset used in this project and available via the extension is **[Office Interior Tileset (16x16)](https://donarg.itch.io/officetileset)** by **Donarg**, available on itch.io for **$2 USD**.
 
-This is the only part of the project that is not freely available. The tileset is not included in this repository due to its license. To use Pixel Agents locally with the full set of office furniture and decorations, purchase the tileset and run the asset import pipeline:
+This is the only part of the project that is not freely available. The tileset is not included in this repository due to its license. To use DigiSpace locally with the full set of office furniture and decorations, purchase the tileset and run the asset import pipeline:
 
 ```bash
 npm run import-tileset
@@ -81,7 +80,12 @@ The extension will still work without the tileset — you'll get the default cha
 
 ## How It Works
 
-Pixel Agents watches Claude Code's JSONL transcript files to track what each agent is doing. When an agent uses a tool (like writing a file or running a command), the extension detects it and updates the character's animation accordingly. No modifications to Claude Code are needed — it's purely observational.
+DigiSpace supports two observation modes:
+
+- Claude Code transcript watching for terminal-native agents
+- External bridge watching via `.digispace/external-agents.json`
+
+When an agent uses a tool, waits for approval, or finishes a lane, DigiSpace updates the character state accordingly. No direct modification of the agents themselves is required.
 
 The webview runs a lightweight game loop with canvas rendering, BFS pathfinding, and a character state machine (idle → walk → type/read). Everything is pixel-perfect at integer zoom levels.
 
@@ -108,6 +112,7 @@ There are several areas where contributions would be very welcome:
 - **Claude Code agent teams** — native support for [agent teams](https://code.claude.com/docs/en/agent-teams), visualizing multi-agent coordination and communication
 - **Git worktree support** — agents working in different worktrees to avoid conflict from parallel work on the same files
 - **Support for other agentic frameworks** — [OpenCode](https://github.com/nichochar/opencode), or really any kind of agentic experiment you'd want to run inside a pixel art interface (see [simile.ai](https://simile.ai/) for inspiration)
+- **Marketplace release hardening** — release automation, publisher pipeline, and richer bridge status rendering
 
 If any of these interest you, feel free to open an issue or submit a PR.
 
@@ -116,6 +121,16 @@ If any of these interest you, feel free to open an issue or submit a PR.
 See [CONTRIBUTORS.md](CONTRIBUTORS.md) for instructions on how to contribute to this project.
 
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+
+## Release
+
+To build and ship DigiSpace from the AllMyStack workspace:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\patch-pixel-agents.ps1 -Action publish -RefreshUpstream
+```
+
+Marketplace publication is handled by GitHub Actions when a `v*` tag is pushed and `VSCE_PAT` is configured in the fork repository secrets.
 
 ## Supporting the Project
 

@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            webview-ui/package-lock.json
+
+      - name: Install extension dependencies
+        run: npm ci
+
+      - name: Install webview dependencies
+        working-directory: webview-ui
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package VSIX
+        run: |
+          mkdir -p artifacts
+          npx --yes @vscode/vsce package --allow-star-activation --out artifacts/digispace-pixel-agent-${GITHUB_REF_NAME:-manual}.vsix
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.vsix
+          generate_release_notes: true
+
+      - name: Publish to Visual Studio Marketplace
+        if: ${{ secrets.VSCE_PAT != '' }}
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish --packagePath artifacts/*.vsix -p "$VSCE_PAT"

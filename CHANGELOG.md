@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.1.0
+
+### Features
+
+- DigiSpace branding, command IDs, and dedicated VS Code panel
+- External bridge support for Codex, Claude, Gemini, and Vibe-based orchestration lanes
+- Dedicated `.digispace/external-agents.json` state file with compatibility bridge from AllMyStack
+
+### Release
+
+- GitHub release and VS Code Marketplace publication workflow prepared for the DigiSpace fork
+- Local patch/build/package/install pipeline automated through AllMyStack
+
+### Compatibility
+
+- Coexists cleanly with upstream Pixel Agents command IDs and workspace storage
+- Marketplace metadata prepared for the `byhdn.digispace-pixel-agent` publisher namespace
+
 ## v1.0.2
 
 ### Bug Fixes
