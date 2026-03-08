@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.1
+
+### Fixes
+
+- GitHub Actions release workflow validation fixed for Marketplace publish gating
+- CI packaging step now creates the `artifacts/` directory before calling `vsce`
+
 ## v1.1.0
 
 ### Features
