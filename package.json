@@ -1,12 +1,12 @@
 {
-  "name": "pixel-agents",
-  "displayName": "Pixel Agents",
-  "description": "Pixel art office where your Claude Code agents come to life as animated characters",
+  "name": "digispace-pixel-agent",
+  "displayName": "DigiSpace",
+  "description": "Pixel office dashboard for Codex, Claude, Gemini, and Vibe-driven AI delivery lanes",
   "version": "1.0.2",
-  "publisher": "pablodelucca",
+  "publisher": "byhdn",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pablodelucca/pixel-agents"
+    "url": "https://github.com/byhdn/digispace-pixel-agent"
   },
   "icon": "icon.png",
   "license": "MIT",
@@ -21,29 +21,29 @@
   "contributes": {
     "commands": [
       {
-        "command": "pixel-agents.showPanel",
-        "title": "Pixel Agents: Show Panel"
+        "command": "digispace.showPanel",
+        "title": "DigiSpace: Show Panel"
       },
       {
-        "command": "pixel-agents.exportDefaultLayout",
-        "title": "Pixel Agents: Export Layout as Default"
+        "command": "digispace.exportDefaultLayout",
+        "title": "DigiSpace: Export Layout as Default"
       }
     ],
     "viewsContainers": {
       "panel": [
         {
-          "id": "pixel-agents-panel",
-          "title": "Pixel Agents",
+          "id": "digispace-panel",
+          "title": "DigiSpace",
           "icon": "$(window)"
         }
       ]
     },
     "views": {
-      "pixel-agents-panel": [
+      "digispace-panel": [
         {
           "type": "webview",
-          "id": "pixel-agents.panelView",
-          "name": "Pixel Agents"
+          "id": "digispace.panelView",
+          "name": "DigiSpace"
         }
       ]
     }

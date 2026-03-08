@@ -68,6 +68,7 @@ export async function launchNewTerminal(
   const agent: AgentState = {
     id,
     terminalRef: terminal,
+    agentKind: 'terminal',
     projectDir,
     jsonlFile: expectedFile,
     fileOffset: 0,
@@ -161,7 +162,9 @@ export function removeAgent(
   }
   pollingTimers.delete(agentId);
   try {
-    fs.unwatchFile(agent.jsonlFile);
+    if (agent.jsonlFile) {
+      fs.unwatchFile(agent.jsonlFile);
+    }
   } catch {
     /* ignore */
   }
@@ -181,6 +184,9 @@ export function persistAgents(
 ): void {
   const persisted: PersistedAgent[] = [];
   for (const agent of agents.values()) {
+    if (agent.agentKind === 'external' || !agent.terminalRef) {
+      continue;
+    }
     persisted.push({
       id: agent.id,
       terminalName: agent.terminalRef.name,
@@ -223,6 +229,7 @@ export function restoreAgents(
     const agent: AgentState = {
       id: p.id,
       terminalRef: terminal,
+      agentKind: 'terminal',
       projectDir: p.projectDir,
       jsonlFile: p.jsonlFile,
       fileOffset: 0,

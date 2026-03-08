@@ -1,10 +1,10 @@
-# Pixel Agents
+# DigiSpace
 
 A VS Code extension that turns your AI coding agents into animated pixel art characters in a virtual office.
 
 Each Claude Code terminal you open spawns a character that walks around, sits at desks, and visually reflects what the agent is doing — typing when writing code, reading when searching files, waiting when it needs your attention.
 
-This is the source code for the free [Pixel Agents extension for VS Code](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents) — you can install it directly from the marketplace with the full furniture catalog included.
+This repository contains the DigiSpace fork of Pixel Agents for VS Code, adapted to visualize Codex, Claude, Gemini, and Vibe-driven delivery lanes.
 
 
 ![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
