@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { CHARACTER_SITTING_OFFSET_PX, TOOL_OVERLAY_VERTICAL_OFFSET } from '../../constants.js';
-import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js';
+import type { AgentDetail, SubagentCharacter } from '../../hooks/useExtensionMessages.js';
 import type { OfficeState } from '../engine/officeState.js';
 import type { ToolActivity } from '../types.js';
 import { CharacterState, TILE_SIZE } from '../types.js';
@@ -11,10 +11,47 @@ interface ToolOverlayProps {
   agents: number[];
   agentTools: Record<number, ToolActivity[]>;
   subagentCharacters: SubagentCharacter[];
+  agentDetails: Record<number, AgentDetail>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   zoom: number;
   panRef: React.RefObject<{ x: number; y: number }>;
   onCloseAgent: (id: number) => void;
+}
+
+function providerLabel(provider?: AgentDetail['provider']): string {
+  if (provider === 'codex') return 'Codex';
+  if (provider === 'gemini') return 'Gemini';
+  return 'Claude';
+}
+
+function statusLabel(status?: AgentDetail['status']): string {
+  switch (status) {
+    case 'waiting':
+      return 'Waiting';
+    case 'blocked':
+      return 'Blocked';
+    case 'review':
+      return 'Review';
+    case 'done':
+      return 'Done';
+    default:
+      return 'Active';
+  }
+}
+
+function statusColor(status?: AgentDetail['status']): string {
+  switch (status) {
+    case 'waiting':
+      return '#cbd5e1';
+    case 'blocked':
+      return '#fca5a5';
+    case 'review':
+      return '#fcd34d';
+    case 'done':
+      return '#86efac';
+    default:
+      return '#93c5fd';
+  }
 }
 
 /** Derive a short human-readable activity string from tools/status */
@@ -46,6 +83,7 @@ export function ToolOverlay({
   agents,
   agentTools,
   subagentCharacters,
+  agentDetails,
   containerRef,
   zoom,
   panRef,
@@ -193,6 +231,21 @@ export function ToolOverlay({
                     }}
                   >
                     {ch.folderName}
+                  </span>
+                )}
+                {!isSub && agentDetails[id]?.provider && (
+                  <span
+                    style={{
+                      fontSize: '14px',
+                      color: statusColor(agentDetails[id]?.status),
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: 'block',
+                    }}
+                  >
+                    {providerLabel(agentDetails[id]?.provider)}
+                    {` · ${statusLabel(agentDetails[id]?.status)}`}
+                    {agentDetails[id]?.activeCardId ? ` · ${agentDetails[id]?.activeCardId}` : ''}
                   </span>
                 )}
               </div>

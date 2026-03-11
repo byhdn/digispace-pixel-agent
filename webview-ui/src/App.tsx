@@ -1,6 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { BottomToolbar } from './components/BottomToolbar.js';
+import { BoardPanel } from './components/BoardPanel.js';
+import { ContextPanel } from './components/ContextPanel.js';
 import { DebugView } from './components/DebugView.js';
 import { ZoomControls } from './components/ZoomControls.js';
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js';
@@ -137,9 +139,18 @@ function App() {
     layoutReady,
     loadedAssets,
     workspaceFolders,
+    board,
+    projectContext,
+    agentDetails,
+    activeTab,
   } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty);
 
   const [isDebugMode, setIsDebugMode] = useState(false);
+  const [visibleTab, setVisibleTab] = useState<'office' | 'board' | 'context'>('office');
+
+  useEffect(() => {
+    setVisibleTab(activeTab);
+  }, [activeTab]);
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), []);
 
@@ -164,6 +175,106 @@ function App() {
 
   const handleCloseAgent = useCallback((id: number) => {
     vscode.postMessage({ type: 'closeAgent', id });
+  }, []);
+
+  const handleSelectCard = useCallback(
+    (cardId: string | null) => {
+      vscode.postMessage({
+        type: 'cardSelected',
+        cardId,
+        workspaceRoot: board?.workspaceRoot ?? projectContext?.workspaceRoot ?? null,
+      });
+    },
+    [board?.workspaceRoot, projectContext?.workspaceRoot],
+  );
+
+  const handleCreateCard = useCallback(
+    (payload: {
+      title: string;
+      description: string;
+      priority: 'low' | 'medium' | 'high' | 'urgent';
+    }) => {
+      vscode.postMessage({
+        type: 'cardCreate',
+        ...payload,
+        workspaceRoot: board?.workspaceRoot ?? projectContext?.workspaceRoot ?? null,
+      });
+    },
+    [board?.workspaceRoot, projectContext?.workspaceRoot],
+  );
+
+  const handleUpdateCard = useCallback(
+    (
+      cardId: string,
+      payload: {
+        title?: string;
+        description?: string;
+        priority?: 'low' | 'medium' | 'high' | 'urgent';
+        summary?: string;
+      },
+    ) => {
+      vscode.postMessage({
+        type: 'cardUpdate',
+        cardId,
+        ...payload,
+        workspaceRoot: board?.workspaceRoot ?? projectContext?.workspaceRoot ?? null,
+      });
+    },
+    [board?.workspaceRoot, projectContext?.workspaceRoot],
+  );
+
+  const handleMoveCard = useCallback(
+    (cardId: string, status: 'inbox' | 'ready' | 'in_progress' | 'review' | 'blocked' | 'done') => {
+      vscode.postMessage({
+        type: 'cardMove',
+        cardId,
+        status,
+        workspaceRoot: board?.workspaceRoot ?? projectContext?.workspaceRoot ?? null,
+      });
+    },
+    [board?.workspaceRoot, projectContext?.workspaceRoot],
+  );
+
+  const handleArchiveCard = useCallback(
+    (cardId: string) => {
+      vscode.postMessage({
+        type: 'cardArchive',
+        cardId,
+        workspaceRoot: board?.workspaceRoot ?? projectContext?.workspaceRoot ?? null,
+      });
+    },
+    [board?.workspaceRoot, projectContext?.workspaceRoot],
+  );
+
+  const handleLaunchAgentForCard = useCallback(
+    (cardId: string) => {
+      vscode.postMessage({
+        type: 'launchAgentForCard',
+        cardId,
+        workspaceRoot: board?.workspaceRoot ?? projectContext?.workspaceRoot ?? null,
+      });
+    },
+    [board?.workspaceRoot, projectContext?.workspaceRoot],
+  );
+
+  const handleAssignAgent = useCallback(
+    (cardId: string, agentId: number | null) => {
+      vscode.postMessage({
+        type: 'agentAssignCard',
+        cardId,
+        agentId,
+        workspaceRoot: board?.workspaceRoot ?? projectContext?.workspaceRoot ?? null,
+      });
+    },
+    [board?.workspaceRoot, projectContext?.workspaceRoot],
+  );
+
+  const handleCaptureSummary = useCallback(() => {
+    vscode.postMessage({ type: 'captureAgentSummary' });
+  }, []);
+
+  const handleOpenSessionsFolder = useCallback(() => {
+    vscode.postMessage({ type: 'openSessionsFolder' });
   }, []);
 
   const handleClick = useCallback((agentId: number) => {
@@ -260,12 +371,51 @@ function App() {
 
       <BottomToolbar
         isEditMode={editor.isEditMode}
-        onOpenClaude={editor.handleOpenClaude}
+        onOpenAgent={editor.handleOpenAgent}
         onToggleEditMode={editor.handleToggleEditMode}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
         workspaceFolders={workspaceFolders}
       />
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          zIndex: 47,
+          display: 'flex',
+          gap: 6,
+          background: 'rgba(15, 23, 42, 0.92)',
+          border: '2px solid var(--pixel-border)',
+          padding: 6,
+          boxShadow: 'var(--pixel-shadow)',
+        }}
+      >
+        {(['office', 'board', 'context'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              setVisibleTab(tab);
+              if (tab === 'board') {
+                vscode.postMessage({ type: 'showBoard' });
+              }
+            }}
+            style={{
+              padding: '6px 10px',
+              border:
+                visibleTab === tab ? '2px solid var(--pixel-accent)' : '2px solid transparent',
+              background: visibleTab === tab ? 'var(--pixel-active-bg)' : 'var(--pixel-btn-bg)',
+              color: 'var(--pixel-text)',
+              cursor: 'pointer',
+              fontSize: 14,
+              textTransform: 'capitalize',
+            }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
       {editor.isEditMode && editor.isDirty && (
         <EditActionBar editor={editor} editorState={editorState} />
@@ -326,11 +476,39 @@ function App() {
         agents={agents}
         agentTools={agentTools}
         subagentCharacters={subagentCharacters}
+        agentDetails={agentDetails}
         containerRef={containerRef}
         zoom={editor.zoom}
         panRef={editor.panRef}
         onCloseAgent={handleCloseAgent}
       />
+
+      {visibleTab === 'board' && (
+        <BoardPanel
+          board={board}
+          agents={agents}
+          agentDetails={agentDetails}
+          onSelectCard={handleSelectCard}
+          onCreateCard={handleCreateCard}
+          onUpdateCard={handleUpdateCard}
+          onMoveCard={handleMoveCard}
+          onArchiveCard={handleArchiveCard}
+          onLaunchAgentForCard={handleLaunchAgentForCard}
+          onAssignAgent={handleAssignAgent}
+          onCaptureSummary={handleCaptureSummary}
+        />
+      )}
+
+      {visibleTab === 'context' && (
+        <ContextPanel
+          projectContext={projectContext}
+          board={board}
+          agents={agents}
+          agentDetails={agentDetails}
+          onOpenSessionsFolder={handleOpenSessionsFolder}
+          onCaptureSummary={handleCaptureSummary}
+        />
+      )}
 
       {isDebugMode && (
         <DebugView

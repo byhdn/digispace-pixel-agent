@@ -1,8 +1,8 @@
 # DigiSpace
 
-DigiSpace is a VS Code extension that turns your AI delivery lanes into animated pixel art characters in a virtual office.
+DigiSpace is a VS Code extension that turns your AI delivery lanes into a local-first project cockpit: animated pixel agents, a synchronized kanban, and persistent handoff context stored inside the project.
 
-It keeps the original terminal-driven Pixel Agents experience for Claude Code, and adds an external bridge model for Codex, Gemini, and Vibe-based orchestration.
+It keeps the terminal-driven Pixel Agents experience for Claude Code, and extends it with project-aware launches for Codex and Gemini plus an external bridge model for orchestration lanes.
 
 ![DigiSpace screenshot](webview-ui/public/Screenshot.jpg)
 
@@ -10,12 +10,15 @@ It keeps the original terminal-driven Pixel Agents experience for Claude Code, a
 
 - **One agent, one character** — every tracked lane gets its own animated character
 - **Live activity tracking** — characters animate based on what the agent is actually doing (writing, reading, running commands)
+- **Project-local board** — every workspace gets `.digispace/kanban.json`, `.digispace/context.json`, `.digispace/journal.ndjson`, and `.digispace/sessions/`
+- **Integrated Board and Context views** — manage cards, sessions, and project metadata without leaving the DigiSpace panel
+- **Provider-aware launch flow** — `+ Agent` can start Claude, Codex, or Gemini and inject the current project handoff plus selected board card
 - **External bridge support** — visualize Codex, Gemini, Claude arbitration lanes, and Vibe workspaces from `.digispace/external-agents.json`
 - **Office layout editor** — design your office with floors, walls, and furniture using a built-in editor
 - **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
 - **Sound notifications** — optional chime when an agent finishes its turn
 - **Sub-agent visualization** — Task tool sub-agents spawn as separate characters linked to their parent
-- **Persistent layouts** — your office design is saved and shared across VS Code windows
+- **Persistent project state** — office layout, board selection, journal, and handoff survive reloads and sync across VS Code windows on the same project
 - **Diverse characters** — 6 diverse characters. These are based on the amazing work of [JIK-A-4, Metro City](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack).
 
 <p align="center">
@@ -47,10 +50,24 @@ Then press **F5** in VS Code to launch the Extension Development Host.
 ### Usage
 
 1. Open the **DigiSpace** panel
-2. Click **+ Agent** to spawn a new Claude Code terminal and its character
-3. Or feed DigiSpace through `.digispace/external-agents.json` for external agents
-4. Click a character to select it, then click a seat to reassign it
-5. Click **Layout** to open the office editor and customize your space
+2. Use `+ Agent` to choose `Claude`, `Codex`, or `Gemini`
+3. Open the `Board` tab to create or select a card for the current task
+4. Launch an agent from the selected card or assign an existing agent to it
+5. Use the `Context` tab to inspect project metadata, active agents, and recent session summaries
+6. Click a character to select it, then click a seat to reassign it
+7. Click **Layout** to open the office editor and customize your space
+
+### Local Project Storage
+
+For every project, DigiSpace stores its runtime state under `.digispace/`:
+
+- `kanban.json` — local-first board and selected card
+- `context.json` — project metadata and detected instruction files
+- `journal.ndjson` — append-only board and agent activity log
+- `agent-handoff.md` — shared handoff brief for newly launched agents
+- `sessions/*.md` — session summaries captured from the panel
+
+If the workspace is inside a Git repository, DigiSpace automatically adds `.digispace/` to `.git/info/exclude` so this local runtime state stays out of version control.
 
 ## Layout Editor
 
@@ -85,6 +102,8 @@ DigiSpace supports two observation modes:
 - Claude Code transcript watching for terminal-native agents
 - External bridge watching via `.digispace/external-agents.json`
 
+For Codex and Gemini, DigiSpace uses a lighter model: provider-aware launch commands, project handoff files, selected board card context, and board-driven lifecycle state (`active`, `review`, `blocked`, `done`) when transcript telemetry is not available.
+
 When an agent uses a tool, waits for approval, or finishes a lane, DigiSpace updates the character state accordingly. No direct modification of the agents themselves is required.
 
 The webview runs a lightweight game loop with canvas rendering, BFS pathfinding, and a character state machine (idle → walk → type/read). Everything is pixel-perfect at integer zoom levels.
@@ -98,6 +117,7 @@ The webview runs a lightweight game loop with canvas rendering, BFS pathfinding,
 
 - **Agent-terminal sync** — the way agents are connected to Claude Code terminal instances is not super robust and sometimes desyncs, especially when terminals are rapidly opened/closed or restored across sessions.
 - **Heuristic-based status detection** — Claude Code's JSONL transcript format does not provide clear signals for when an agent is waiting for user input or when it has finished its turn. The current detection is based on heuristics (idle timers, turn-duration events) and often misfires — agents may briefly show the wrong status or miss transitions.
+- **Provider telemetry parity** — Claude still has the richest live telemetry. Codex and Gemini currently rely on launch context, board lifecycle state, and saved summaries rather than a fully parsed live transcript stream.
 - **Windows-only testing** — the extension has only been tested on Windows 11. It may work on macOS or Linux, but there could be unexpected issues with file watching, paths, or terminal behavior on those platforms.
 
 ## Roadmap
@@ -113,6 +133,7 @@ There are several areas where contributions would be very welcome:
 - **Git worktree support** — agents working in different worktrees to avoid conflict from parallel work on the same files
 - **Support for other agentic frameworks** — [OpenCode](https://github.com/nichochar/opencode), or really any kind of agentic experiment you'd want to run inside a pixel art interface (see [simile.ai](https://simile.ai/) for inspiration)
 - **Marketplace release hardening** — release automation, publisher pipeline, and richer bridge status rendering
+- **Provider telemetry parity** — deeper structured event parsing for Codex and Gemini if their CLIs expose stable machine-readable session signals
 
 If any of these interest you, feel free to open an issue or submit a PR.
 

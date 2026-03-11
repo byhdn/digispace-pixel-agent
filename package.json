@@ -2,7 +2,7 @@
   "name": "digispace-pixel-agent",
   "displayName": "DigiSpace",
   "description": "Pixel office dashboard for Codex, Claude, Gemini, and Vibe-driven AI delivery lanes",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "publisher": "byhdn",
   "repository": {
     "type": "git",
@@ -41,6 +41,22 @@
       {
         "command": "digispace.showPanel",
         "title": "DigiSpace: Show Panel"
+      },
+      {
+        "command": "digispace.showBoard",
+        "title": "DigiSpace: Show Board"
+      },
+      {
+        "command": "digispace.newCard",
+        "title": "DigiSpace: New Card"
+      },
+      {
+        "command": "digispace.launchAgentForCard",
+        "title": "DigiSpace: Launch Agent For Selected Card"
+      },
+      {
+        "command": "digispace.captureAgentSummary",
+        "title": "DigiSpace: Capture Agent Summary"
       },
       {
         "command": "digispace.exportDefaultLayout",

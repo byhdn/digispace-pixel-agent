@@ -81,6 +81,7 @@ export function processTranscriptLine(
       if (hasToolUse) {
         cancelWaitingTimer(agentId, waitingTimers);
         agent.isWaiting = false;
+        agent.status = 'active';
         agent.hadToolsInTurn = true;
         webview?.postMessage({ type: 'agentStatus', id: agentId, status: 'active' });
         let hasNonExemptTool = false;
@@ -180,6 +181,7 @@ export function processTranscriptLine(
       }
 
       agent.isWaiting = true;
+      agent.status = 'waiting';
       agent.permissionSent = false;
       agent.hadToolsInTurn = false;
       webview?.postMessage({

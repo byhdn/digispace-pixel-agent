@@ -3,16 +3,28 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
+import { createLaunchPlan, terminalNameForProvider } from './agentLaunch.js';
 import {
   JSONL_POLL_INTERVAL_MS,
-  TERMINAL_NAME_PREFIX,
   WORKSPACE_KEY_AGENT_SEATS,
   WORKSPACE_KEY_AGENTS,
 } from './constants.js';
 import { ensureProjectScan, readNewLines, startFileWatching } from './fileWatcher.js';
 import { migrateAndLoadLayout } from './layoutPersistence.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
-import type { AgentState, PersistedAgent } from './types.js';
+import type { AgentLifecycleStatus, AgentProvider, AgentState, PersistedAgent } from './types.js';
+
+function normalizeAgentStatus(value: unknown): AgentLifecycleStatus {
+  switch (value) {
+    case 'waiting':
+    case 'blocked':
+    case 'review':
+    case 'done':
+      return value;
+    default:
+      return 'active';
+  }
+}
 
 export function getProjectDirPath(cwd?: string): string | null {
   const workspacePath = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -24,6 +36,7 @@ export function getProjectDirPath(cwd?: string): string | null {
 }
 
 export async function launchNewTerminal(
+  provider: AgentProvider,
   nextAgentIdRef: { current: number },
   nextTerminalIndexRef: { current: number },
   agents: Map<number, AgentState>,
@@ -38,39 +51,42 @@ export async function launchNewTerminal(
   webview: vscode.Webview | undefined,
   persistAgents: () => void,
   folderPath?: string,
-): Promise<void> {
+  activeCardId?: string | null,
+): Promise<number | null> {
   const folders = vscode.workspace.workspaceFolders;
   const cwd = folderPath || folders?.[0]?.uri.fsPath;
+  if (!cwd) {
+    vscode.window.showWarningMessage('DigiSpace: No workspace folder available for agent launch.');
+    return null;
+  }
   const isMultiRoot = !!(folders && folders.length > 1);
   const idx = nextTerminalIndexRef.current++;
+  const folderLabel =
+    isMultiRoot && cwd
+      ? (folders?.find((folder) => folder.uri.fsPath === cwd)?.name ?? path.basename(cwd))
+      : undefined;
+  const launchPlan = createLaunchPlan(provider, cwd, agents, folderLabel, activeCardId);
   const terminal = vscode.window.createTerminal({
-    name: `${TERMINAL_NAME_PREFIX} #${idx}`,
+    name: terminalNameForProvider(provider, idx),
     cwd,
   });
   terminal.show();
-
-  const sessionId = crypto.randomUUID();
-  terminal.sendText(`claude --session-id ${sessionId}`);
-
-  const projectDir = getProjectDirPath(cwd);
-  if (!projectDir) {
-    console.log(`[Pixel Agents] No project dir, cannot track agent`);
-    return;
-  }
-
-  // Pre-register expected JSONL file so project scan won't treat it as a /clear file
-  const expectedFile = path.join(projectDir, `${sessionId}.jsonl`);
-  knownJsonlFiles.add(expectedFile);
+  terminal.sendText(launchPlan.command);
 
   // Create agent immediately (before JSONL file exists)
   const id = nextAgentIdRef.current++;
-  const folderName = isMultiRoot && cwd ? path.basename(cwd) : undefined;
   const agent: AgentState = {
     id,
     terminalRef: terminal,
     agentKind: 'terminal',
-    projectDir,
-    jsonlFile: expectedFile,
+    provider,
+    workspaceRoot: cwd,
+    activeCardId: activeCardId ?? null,
+    sessionRef: null,
+    lastSummaryAt: null,
+    status: 'active',
+    projectDir: launchPlan.projectDir,
+    jsonlFile: launchPlan.expectedJsonlFile || '',
     fileOffset: 0,
     lineBuffer: '',
     activeToolIds: new Set(),
@@ -81,56 +97,68 @@ export async function launchNewTerminal(
     isWaiting: false,
     permissionSent: false,
     hadToolsInTurn: false,
-    folderName,
+    folderName: launchPlan.displayLabel,
   };
 
   agents.set(id, agent);
   activeAgentIdRef.current = id;
   persistAgents();
   console.log(`[Pixel Agents] Agent ${id}: created for terminal ${terminal.name}`);
-  webview?.postMessage({ type: 'agentCreated', id, folderName });
+  webview?.postMessage({
+    type: 'agentCreated',
+    id,
+    folderName: launchPlan.displayLabel,
+    provider,
+    workspaceRoot: cwd,
+    activeCardId: activeCardId ?? null,
+  });
 
-  ensureProjectScan(
-    projectDir,
-    knownJsonlFiles,
-    projectScanTimerRef,
-    activeAgentIdRef,
-    nextAgentIdRef,
-    agents,
-    fileWatchers,
-    pollingTimers,
-    waitingTimers,
-    permissionTimers,
-    webview,
-    persistAgents,
-  );
+  if (provider === 'claude' && launchPlan.expectedJsonlFile) {
+    const projectDir = launchPlan.projectDir;
+    knownJsonlFiles.add(launchPlan.expectedJsonlFile);
+    ensureProjectScan(
+      projectDir,
+      knownJsonlFiles,
+      projectScanTimerRef,
+      activeAgentIdRef,
+      nextAgentIdRef,
+      agents,
+      fileWatchers,
+      pollingTimers,
+      waitingTimers,
+      permissionTimers,
+      webview,
+      persistAgents,
+    );
 
-  // Poll for the specific JSONL file to appear
-  const pollTimer = setInterval(() => {
-    try {
-      if (fs.existsSync(agent.jsonlFile)) {
-        console.log(
-          `[Pixel Agents] Agent ${id}: found JSONL file ${path.basename(agent.jsonlFile)}`,
-        );
-        clearInterval(pollTimer);
-        jsonlPollTimers.delete(id);
-        startFileWatching(
-          id,
-          agent.jsonlFile,
-          agents,
-          fileWatchers,
-          pollingTimers,
-          waitingTimers,
-          permissionTimers,
-          webview,
-        );
-        readNewLines(id, agents, waitingTimers, permissionTimers, webview);
+    const pollTimer = setInterval(() => {
+      try {
+        if (fs.existsSync(agent.jsonlFile)) {
+          console.log(
+            `[Pixel Agents] Agent ${id}: found JSONL file ${path.basename(agent.jsonlFile)}`,
+          );
+          clearInterval(pollTimer);
+          jsonlPollTimers.delete(id);
+          startFileWatching(
+            id,
+            agent.jsonlFile,
+            agents,
+            fileWatchers,
+            pollingTimers,
+            waitingTimers,
+            permissionTimers,
+            webview,
+          );
+          readNewLines(id, agents, waitingTimers, permissionTimers, webview);
+        }
+      } catch {
+        /* file may not exist yet */
       }
-    } catch {
-      /* file may not exist yet */
-    }
-  }, JSONL_POLL_INTERVAL_MS);
-  jsonlPollTimers.set(id, pollTimer);
+    }, JSONL_POLL_INTERVAL_MS);
+    jsonlPollTimers.set(id, pollTimer);
+  }
+
+  return id;
 }
 
 export function removeAgent(
@@ -192,6 +220,12 @@ export function persistAgents(
       terminalName: agent.terminalRef.name,
       jsonlFile: agent.jsonlFile,
       projectDir: agent.projectDir,
+      provider: agent.provider,
+      workspaceRoot: agent.workspaceRoot,
+      activeCardId: agent.activeCardId,
+      sessionRef: agent.sessionRef,
+      lastSummaryAt: agent.lastSummaryAt,
+      status: agent.status,
       folderName: agent.folderName,
     });
   }
@@ -230,6 +264,12 @@ export function restoreAgents(
       id: p.id,
       terminalRef: terminal,
       agentKind: 'terminal',
+      provider: p.provider ?? 'claude',
+      workspaceRoot: p.workspaceRoot,
+      activeCardId: p.activeCardId ?? null,
+      sessionRef: p.sessionRef ?? null,
+      lastSummaryAt: p.lastSummaryAt ?? null,
+      status: normalizeAgentStatus(p.status),
       projectDir: p.projectDir,
       jsonlFile: p.jsonlFile,
       fileOffset: 0,
@@ -250,7 +290,7 @@ export function restoreAgents(
     console.log(`[Pixel Agents] Restored agent ${p.id} → terminal "${p.terminalName}"`);
 
     if (p.id > maxId) maxId = p.id;
-    // Extract terminal index from name like "Claude Code #3"
+    // Extract terminal index from name like "Claude #3"
     const match = p.terminalName.match(/#(\d+)$/);
     if (match) {
       const idx = parseInt(match[1], 10);
@@ -261,7 +301,7 @@ export function restoreAgents(
 
     // Start file watching if JSONL exists, skipping to end of file
     try {
-      if (fs.existsSync(p.jsonlFile)) {
+      if (p.jsonlFile && fs.existsSync(p.jsonlFile)) {
         const stat = fs.statSync(p.jsonlFile);
         agent.fileOffset = stat.size;
         startFileWatching(
@@ -274,7 +314,7 @@ export function restoreAgents(
           permissionTimers,
           webview,
         );
-      } else {
+      } else if (p.jsonlFile) {
         // Poll for the file to appear
         const pollTimer = setInterval(() => {
           try {
@@ -355,10 +395,29 @@ export function sendExistingAgents(
 
   // Include folderName per agent
   const folderNames: Record<number, string> = {};
+  const agentDetails: Record<
+    number,
+    {
+      provider?: AgentProvider;
+      workspaceRoot?: string;
+      activeCardId?: string | null;
+      sessionRef?: string | null;
+      lastSummaryAt?: string | null;
+      status?: AgentLifecycleStatus;
+    }
+  > = {};
   for (const [id, agent] of agents) {
     if (agent.folderName) {
       folderNames[id] = agent.folderName;
     }
+    agentDetails[id] = {
+      provider: agent.provider,
+      workspaceRoot: agent.workspaceRoot,
+      activeCardId: agent.activeCardId ?? null,
+      sessionRef: agent.sessionRef ?? null,
+      lastSummaryAt: agent.lastSummaryAt ?? null,
+      status: normalizeAgentStatus(agent.status),
+    };
   }
   console.log(
     `[Pixel Agents] sendExistingAgents: agents=${JSON.stringify(agentIds)}, meta=${JSON.stringify(agentMeta)}`,
@@ -369,6 +428,7 @@ export function sendExistingAgents(
     agents: agentIds,
     agentMeta,
     folderNames,
+    agentDetails,
   });
 
   sendCurrentAgentStatuses(agents, webview);

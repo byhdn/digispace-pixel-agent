@@ -35,6 +35,10 @@ export const GLOBAL_KEY_SOUND_ENABLED = 'digispace.soundEnabled';
 // ── VS Code Identifiers ─────────────────────────────────────
 export const VIEW_ID = 'digispace.panelView';
 export const COMMAND_SHOW_PANEL = 'digispace.showPanel';
+export const COMMAND_SHOW_BOARD = 'digispace.showBoard';
+export const COMMAND_NEW_CARD = 'digispace.newCard';
+export const COMMAND_LAUNCH_AGENT_FOR_CARD = 'digispace.launchAgentForCard';
+export const COMMAND_CAPTURE_AGENT_SUMMARY = 'digispace.captureAgentSummary';
 export const COMMAND_EXPORT_DEFAULT_LAYOUT = 'digispace.exportDefaultLayout';
 export const WORKSPACE_KEY_AGENTS = 'digispace.agents';
 export const WORKSPACE_KEY_AGENT_SEATS = 'digispace.agentSeats';

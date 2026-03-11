@@ -1,14 +1,14 @@
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import type { ExtensionContext } from 'vscode';
+import * as vscode from 'vscode';
 
 import {
-  LAYOUT_FILE_DIR,
   LAYOUT_FILE_NAME,
   LAYOUT_FILE_POLL_INTERVAL_MS,
   WORKSPACE_KEY_LAYOUT,
 } from './constants.js';
+import { getProjectPaths, migrateLegacyLayoutToWorkspace } from './projectStore.js';
 
 export interface LayoutWatcher {
   markOwnWrite(): void;
@@ -16,7 +16,12 @@ export interface LayoutWatcher {
 }
 
 function getLayoutFilePath(): string {
-  return path.join(os.homedir(), LAYOUT_FILE_DIR, LAYOUT_FILE_NAME);
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!workspaceRoot) {
+    return path.join(process.cwd(), '.digispace', LAYOUT_FILE_NAME);
+  }
+  migrateLegacyLayoutToWorkspace(workspaceRoot);
+  return getProjectPaths(workspaceRoot).layoutFile;
 }
 
 export function readLayoutFromFile(): Record<string, unknown> | null {

@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.3
+
+### Features
+
+- Added a project-local DigiSpace board stored under `.digispace/` with `kanban.json`, `context.json`, `journal.ndjson`, `agent-handoff.md`, and session summaries
+- Added integrated `Office`, `Board`, and `Context` views inside the DigiSpace panel
+- Added agent launch from board cards with provider-aware handoff for Claude, Codex, and Gemini
+
+### Improvements
+
+- Agent status is now synchronized from board lifecycle state for providers without rich transcript telemetry
+- Office overlays and context cards now surface provider, active card, session reference, and review/blocking state more clearly
+- Project-local `.digispace/` storage is automatically excluded from Git through `.git/info/exclude`
+
 ## v1.1.2
 
 ### Fixes

@@ -16,6 +16,7 @@ export function clearAgentActivity(
   agent.activeSubagentToolIds.clear();
   agent.activeSubagentToolNames.clear();
   agent.isWaiting = false;
+  agent.status = 'active';
   agent.permissionSent = false;
   cancelPermissionTimer(agentId, permissionTimers);
   webview?.postMessage({ type: 'agentToolsClear', id: agentId });
@@ -46,6 +47,7 @@ export function startWaitingTimer(
     const agent = agents.get(agentId);
     if (agent) {
       agent.isWaiting = true;
+      agent.status = 'waiting';
     }
     webview?.postMessage({
       type: 'agentStatus',

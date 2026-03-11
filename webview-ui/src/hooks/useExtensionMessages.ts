@@ -41,6 +41,82 @@ export interface WorkspaceFolder {
   path: string;
 }
 
+export interface BoardCardLink {
+  label: string;
+  href: string;
+}
+
+export interface BoardCard {
+  id: string;
+  title: string;
+  description: string;
+  status: 'inbox' | 'ready' | 'in_progress' | 'review' | 'blocked' | 'done' | 'archived';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  ownerProvider?: 'claude' | 'codex' | 'gemini';
+  ownerAgentId?: number | null;
+  labels: string[];
+  links: BoardCardLink[];
+  source: 'ui' | 'agent' | 'import';
+  workspaceRoot: string;
+  sessionRef?: string | null;
+  summary?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string | null;
+}
+
+export interface BoardState {
+  version: 1;
+  workspaceRoot: string;
+  columns: Array<{
+    id: 'inbox' | 'ready' | 'in_progress' | 'review' | 'blocked' | 'done';
+    title: string;
+  }>;
+  cards: BoardCard[];
+  selectedCardId?: string | null;
+  updatedAt: string;
+}
+
+export interface ProjectContextState {
+  version: 1;
+  workspaceRoot: string;
+  projectName: string;
+  projectLinkPath?: string | null;
+  clientName?: string | null;
+  partnerName?: string | null;
+  projectId?: string | null;
+  providerInstructionFiles: string[];
+  gitRepoRoot?: string | null;
+  rules: {
+    localFirst: true;
+    autonomousControlled: true;
+  };
+  updatedAt: string;
+}
+
+export interface AgentDetail {
+  provider?: 'claude' | 'codex' | 'gemini';
+  workspaceRoot?: string;
+  activeCardId?: string | null;
+  sessionRef?: string | null;
+  lastSummaryAt?: string | null;
+  status?: 'active' | 'waiting' | 'blocked' | 'review' | 'done';
+}
+
+type AgentLifecycleStatus = NonNullable<AgentDetail['status']>;
+
+function normalizeAgentLifecycleStatus(value: unknown): AgentLifecycleStatus {
+  switch (value) {
+    case 'waiting':
+    case 'blocked':
+    case 'review':
+    case 'done':
+      return value;
+    default:
+      return 'active';
+  }
+}
+
 export interface ExtensionMessageState {
   agents: number[];
   selectedAgent: number | null;
@@ -51,6 +127,10 @@ export interface ExtensionMessageState {
   layoutReady: boolean;
   loadedAssets?: { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> };
   workspaceFolders: WorkspaceFolder[];
+  board: BoardState | null;
+  projectContext: ProjectContextState | null;
+  agentDetails: Record<number, AgentDetail>;
+  activeTab: 'office' | 'board' | 'context';
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -80,6 +160,10 @@ export function useExtensionMessages(
     { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined
   >();
   const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>([]);
+  const [board, setBoard] = useState<BoardState | null>(null);
+  const [projectContext, setProjectContext] = useState<ProjectContextState | null>(null);
+  const [agentDetails, setAgentDetails] = useState<Record<number, AgentDetail>>({});
+  const [activeTab, setActiveTab] = useState<'office' | 'board' | 'context'>('office');
 
   // Track whether initial layout has been loaded (ref to avoid re-render)
   const layoutReadyRef = useRef(false);
@@ -126,8 +210,22 @@ export function useExtensionMessages(
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number;
         const folderName = msg.folderName as string | undefined;
+        const provider = msg.provider as AgentDetail['provider'] | undefined;
+        const workspaceRoot = msg.workspaceRoot as string | undefined;
+        const activeCardId =
+          typeof msg.activeCardId === 'string' ? (msg.activeCardId as string) : null;
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]));
         setSelectedAgent(id);
+        setAgentDetails((prev) => ({
+          ...prev,
+          [id]: {
+            ...(prev[id] || {}),
+            provider,
+            workspaceRoot,
+            activeCardId,
+            status: 'active',
+          },
+        }));
         os.addAgent(id, undefined, undefined, undefined, undefined, folderName);
         saveAgentSeats(os);
       } else if (msg.type === 'agentClosed') {
@@ -141,6 +239,12 @@ export function useExtensionMessages(
           return next;
         });
         setAgentStatuses((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setAgentDetails((prev) => {
           if (!(id in prev)) return prev;
           const next = { ...prev };
           delete next[id];
@@ -163,6 +267,7 @@ export function useExtensionMessages(
           { palette?: number; hueShift?: number; seatId?: string }
         >;
         const folderNames = (msg.folderNames || {}) as Record<number, string>;
+        const details = (msg.agentDetails || {}) as Record<number, AgentDetail>;
         // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id];
@@ -184,6 +289,7 @@ export function useExtensionMessages(
           }
           return merged.sort((a, b) => a - b);
         });
+        setAgentDetails((prev) => ({ ...prev, ...details }));
       } else if (msg.type === 'agentToolStart') {
         const id = msg.id as number;
         const toolId = msg.toolId as string;
@@ -241,7 +347,7 @@ export function useExtensionMessages(
         setSelectedAgent(id);
       } else if (msg.type === 'agentStatus') {
         const id = msg.id as number;
-        const status = msg.status as string;
+        const status = normalizeAgentLifecycleStatus(msg.status);
         setAgentStatuses((prev) => {
           if (status === 'active') {
             if (!(id in prev)) return prev;
@@ -252,6 +358,10 @@ export function useExtensionMessages(
           return { ...prev, [id]: status };
         });
         os.setAgentActive(id, status === 'active');
+        setAgentDetails((prev) => ({
+          ...prev,
+          [id]: { ...(prev[id] || {}), status },
+        }));
         if (status === 'waiting') {
           os.showWaitingBubble(id);
           playDoneSound();
@@ -371,6 +481,24 @@ export function useExtensionMessages(
       } else if (msg.type === 'workspaceFolders') {
         const folders = msg.folders as WorkspaceFolder[];
         setWorkspaceFolders(folders);
+      } else if (msg.type === 'boardLoaded' || msg.type === 'boardUpdated') {
+        setBoard(msg.board as BoardState);
+      } else if (msg.type === 'contextLoaded') {
+        setProjectContext(msg.context as ProjectContextState);
+      } else if (msg.type === 'uiTabSelected') {
+        const tab = msg.tab as 'office' | 'board' | 'context';
+        setActiveTab(tab);
+      } else if (msg.type === 'agentSummarySaved') {
+        const agentId = msg.agentId as number;
+        const sessionRef = msg.sessionRef as string | null;
+        setAgentDetails((prev) => ({
+          ...prev,
+          [agentId]: {
+            ...(prev[agentId] || {}),
+            sessionRef,
+            lastSummaryAt: new Date().toISOString(),
+          },
+        }));
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean;
         setSoundEnabled(soundOn);
@@ -402,5 +530,9 @@ export function useExtensionMessages(
     layoutReady,
     loadedAssets,
     workspaceFolders,
+    board,
+    projectContext,
+    agentDetails,
+    activeTab,
   };
 }
